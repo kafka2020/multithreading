@@ -1,17 +1,20 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
-        List<Thread> threads = new ArrayList<>();
+        ExecutorService executor = Executors.newCachedThreadPool();
+        List<Future<Integer>> futures = new ArrayList<>();
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
 
         long startTs = System.currentTimeMillis(); // start time
+
         for (String text : texts) {
-            Thread thread = new Thread(() -> {
+            Callable<Integer> task = () -> {
                 int maxSize = 0;
                 for (int i = 0; i < text.length(); i++) {
                     for (int j = 0; j < text.length(); j++) {
@@ -31,18 +34,25 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
-            });
-            threads.add(thread);
-            thread.start();
+                return maxSize;
+            };
+            futures.add(executor.submit(task));
         }
 
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
+        // Поиск максимального значения среди всех результатов
+        int AbsMaxSize = 0;
+        for (Future<Integer> future : futures) {
+            int currentMax = future.get();
+            if (currentMax > AbsMaxSize) {
+                AbsMaxSize = currentMax;
+            }
         }
 
+        executor.shutdown(); // Завершаем работу пула
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
+        System.out.println("Maximum interval among all strings: " + AbsMaxSize);
     }
 
     public static String generateText(String letters, int length) {
